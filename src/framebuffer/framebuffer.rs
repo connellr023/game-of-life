@@ -1,6 +1,7 @@
-pub trait Framebuffer {
-    fn new(width: u32, height: u32) -> Self;
-    fn create_window(&self, title: &str);
+use anyhow::Result;
+
+pub trait Framebuffer: Sized {
+    fn create_window(title: &str, width: u32, height: u32) -> Result<Self>;
     fn handle_events(&self);
     fn render(&self);
     fn write_pixel(&self, x: u32, y: u32, color: u32);
