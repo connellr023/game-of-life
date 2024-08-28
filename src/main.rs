@@ -1,12 +1,13 @@
-#[link(name = "lib")]
-extern "C" {
-    fn say_hello();
-}
+use framebuffer::framebuffer::Framebuffer;
+
+mod framebuffer;
 
 fn main() {
-    println!("Below is from C++");
+    let fb = Framebuffer::new(800, 600);
 
-    unsafe {
-        say_hello();
+    fb.create_window("Test");
+
+    loop {
+        fb.render();
     }
 }

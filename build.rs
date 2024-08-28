@@ -1,10 +1,21 @@
 use cc::Build;
 
 fn main() {
-    Build::new()
-        .cpp(true)
-        .file("cxx/lib.cpp")
-        .compile("lib");
+    let mut build = {
+        let mut build = Build::new();
+
+        build.cpp(true);
+        build
+    };
+
+    if cfg!(target_os = "windows") {
+        build.file("cxx/windows_framebuffer.cpp");
+    }
+    else {
+        panic!("Unsupported OS");
+    }
+
+    build.compile("lib");
 
     println!("cargo:rustc-link-search=native={}", std::env::var("OUT_DIR").unwrap());
     println!("cargo:rustc-link-lib=static=lib");
