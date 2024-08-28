@@ -3,11 +3,16 @@ use framebuffer::framebuffer::Framebuffer;
 mod framebuffer;
 
 fn main() {
-    let fb = Framebuffer::new(800, 600);
-
-    fb.create_window("Test");
+    Framebuffer::create_window("Game of Life", 800, 600);
 
     loop {
-        fb.render();
+        if !Framebuffer::is_running() {
+            break;
+        }
+
+        Framebuffer::handle_events();
+        Framebuffer::render();
     }
+
+    Framebuffer::destroy_window();
 }

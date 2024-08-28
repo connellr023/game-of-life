@@ -1,39 +1,27 @@
 use super::ffi::*;
 
-pub struct Framebuffer {
-    width: u32,
-    height: u32
-}
+pub struct Framebuffer;
 
 impl Framebuffer {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            width,
-            height
-        }
+    pub fn create_window(title: &str, width: u32, height: u32) {
+        assert!(!Self::is_running(), "Window is already running!");
+        create_window_rs(title, width, height);
     }
 
     #[inline(always)]
-    pub fn width(&self) -> u32 {
-        self.width
+    pub fn is_running() -> bool {
+        is_window_running_rs()
     }
 
-    #[inline(always)]
-    pub fn height(&self) -> u32 {
-        self.height
+    pub fn handle_events() {
+        handle_events_rs();
     }
 
-    pub fn create_window(&self, title: &str) {
-        create_window_rs(title, self.width, self.height);
-    }
-
-    pub fn render(&self) {
+    pub fn render() {
         render_rs();
     }
-}
 
-impl Drop for Framebuffer {
-    fn drop(&mut self) {
+    pub fn destroy_window() {
         destroy_window_rs();
     }
 }
