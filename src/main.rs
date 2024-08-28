@@ -1,18 +1,11 @@
-use framebuffer::framebuffer::Framebuffer;
+use framebuffer::prelude::*;
 
 mod framebuffer;
 
 fn main() {
-    Framebuffer::create_window("Game of Life", 800, 600);
+    #[cfg(target_os = "windows")]
+    let fb = WindowsFramebuffer::new(800, 600);
 
-    loop {
-        if !Framebuffer::is_running() {
-            break;
-        }
-
-        Framebuffer::handle_events();
-        Framebuffer::render();
-    }
-
-    Framebuffer::destroy_window();
+    #[cfg(target_os = "linux")]
+    let fb = LinuxFramebuffer::new(800, 600);
 }
