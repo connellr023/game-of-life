@@ -1,40 +1,43 @@
-use std::cell::Cell;
-
 use super::framebuffer::Framebuffer;
 use anyhow::{anyhow, Result};
+use std::{cell::Cell, ffi::OsStr, os::windows::ffi::OsStrExt, ptr::null_mut};
 use windows::{
-    core::{w, PCWSTR},
+    core::PCWSTR,
     Win32::{
-        Foundation::{HANDLE, HWND, LPARAM, LRESULT, WPARAM}, Graphics::Gdi::{
-            BitBlt, CreateCompatibleDC, CreateDIBSection, DeleteDC, GetDC, SelectObject, UpdateWindow, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HBRUSH, HDC, RGBQUAD, SRCCOPY
-        }, System::LibraryLoader::GetModuleHandleW, UI::WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageA, GetMessageA, PeekMessageA, PostQuitMessage, RegisterClassW, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, HCURSOR, HICON, MSG, PEEK_MESSAGE_REMOVE_TYPE, SHOW_WINDOW_CMD, WINDOW_EX_STYLE, WM_CLOSE, WM_DESTROY, WM_QUIT, WNDCLASSW, WS_OVERLAPPEDWINDOW
-        }
-    }
+        Foundation::{HANDLE, HWND, LPARAM, LRESULT, WPARAM},
+        Graphics::Gdi::*,
+        System::LibraryLoader::GetModuleHandleW,
+        UI::WindowsAndMessaging::*,
+    },
 };
 
 pub struct WindowsFramebuffer {
     hwnd: HWND,
     hdc: HDC,
     bitmap: HBITMAP,
-    buffer: Box<[u32]>,
+    buffer: *mut u8,
     width: u32,
     height: u32,
-    is_running: Cell<bool>
+    is_running: Cell<bool>,
 }
 
 impl WindowsFramebuffer {
-    unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe extern "system" fn window_proc(
+        hwnd: HWND,
+        msg: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
         match msg {
             WM_CLOSE => {
                 let _ = DestroyWindow(hwnd);
                 LRESULT(0)
-            },
+            }
             WM_DESTROY => {
                 PostQuitMessage(0);
                 LRESULT(0)
-            },
-            _ => DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }
 }
@@ -42,7 +45,14 @@ impl WindowsFramebuffer {
 impl Framebuffer for WindowsFramebuffer {
     fn create_window(title: &str, width: u32, height: u32) -> Result<Self> {
         let h_instance = unsafe { GetModuleHandleW(None) }?.into();
-        let w_title = w!("For now");
+        let w_title = {
+            let s = OsStr::new(title)
+                .encode_wide()
+                .chain(Some(0))
+                .collect::<Box<[u16]>>();
+
+            PCWSTR(s.as_ptr())
+        };
 
         let wc = WNDCLASSW {
             style: CS_HREDRAW | CS_VREDRAW,
@@ -54,7 +64,7 @@ impl Framebuffer for WindowsFramebuffer {
             hIcon: HICON::default(),
             hCursor: HCURSOR::default(),
             hbrBackground: HBRUSH::default(),
-            lpszMenuName: PCWSTR(&0)
+            lpszMenuName: PCWSTR(&0),
         };
 
         if unsafe { RegisterClassW(&wc) } == 0 {
@@ -74,7 +84,7 @@ impl Framebuffer for WindowsFramebuffer {
                 None,
                 None,
                 h_instance,
-                None
+                None,
             )
         }?;
 
@@ -95,20 +105,27 @@ impl Framebuffer for WindowsFramebuffer {
                 biXPelsPerMeter: 0,
                 biYPelsPerMeter: 0,
                 biClrUsed: 0,
-                biClrImportant: 0
+                biClrImportant: 0,
             },
-            bmiColors: [RGBQUAD { rgbBlue: 0, rgbGreen: 0, rgbRed: 0, rgbReserved: 0 }]
+            bmiColors: [RGBQUAD {
+                rgbBlue: 0,
+                rgbGreen: 0,
+                rgbRed: 0,
+                rgbReserved: 0,
+            }],
         };
 
-        let buffer = vec![0; (width * height) as usize].into_boxed_slice();
-        let bitmap = unsafe { CreateDIBSection(
-            hdc,
-            &bmi,
-            DIB_RGB_COLORS,
-            &mut buffer.as_ptr() as *mut _ as *mut _,
-            HANDLE::default(),
-            0
-        ) }?;
+        let mut buffer: *mut u8 = null_mut();
+        let bitmap = unsafe {
+            CreateDIBSection(
+                hdc,
+                &bmi,
+                DIB_RGB_COLORS,
+                &mut buffer as *mut *mut u8 as *mut *mut std::ffi::c_void,
+                HANDLE::default(),
+                0,
+            )
+        }?;
 
         if bitmap.is_invalid() {
             return Err(anyhow!("CreateDIBSection failed"));
@@ -126,7 +143,7 @@ impl Framebuffer for WindowsFramebuffer {
             buffer,
             width,
             height,
-            is_running: Cell::new(true)
+            is_running: Cell::new(true),
         })
     }
 
@@ -134,26 +151,33 @@ impl Framebuffer for WindowsFramebuffer {
         let mut msg = MSG::default();
 
         unsafe {
-            while self.is_running() {
-                let result = GetMessageA(&mut msg, None, 0, 0);
+            let result = GetMessageA(&mut msg, None, 0, 0);
 
-                if !result.as_bool() {
-                    self.is_running.set(false);
-                }
-                else {
-                    let _ = TranslateMessage(&msg);
-                    DispatchMessageA(&msg);
-                }
+            if !result.as_bool() {
+                self.is_running.set(false);
+            } else {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageA(&msg);
             }
         }
     }
-    
+
     fn render(&self) {
         unsafe {
             let hdc_mem = CreateCompatibleDC(self.hdc);
             let old_bitmap = SelectObject(hdc_mem, self.bitmap);
 
-            match BitBlt(self.hdc, 0, 0, self.width as i32, self.height as i32, hdc_mem, 0, 0, SRCCOPY) {
+            match BitBlt(
+                self.hdc,
+                0,
+                0,
+                self.width as i32,
+                self.height as i32,
+                hdc_mem,
+                0,
+                0,
+                SRCCOPY,
+            ) {
                 Ok(_) => (),
                 Err(_) => {
                     self.is_running.set(false);
@@ -165,24 +189,49 @@ impl Framebuffer for WindowsFramebuffer {
             let _ = DeleteDC(hdc_mem);
         }
     }
-    
+
     fn write_pixel(&self, x: u32, y: u32, color: u32) {
-        todo!()
+        assert!(x < self.width && y < self.height, "Pixel out of bounds");
+
+        let offset = (y * self.width + x) * 4;
+
+        unsafe {
+            let pixel_ptr = self.buffer.add(offset as usize) as *mut u32;
+            *pixel_ptr = color;
+        }
     }
-    
+
     fn register_keydown_listener(&self, keycode: u32, listener: Box<dyn Fn()>) {
         todo!()
     }
-    
+
     fn clear_keydown_listeners(&self) {
         todo!()
     }
-    
+
     fn is_running(&self) -> bool {
         self.is_running.get()
     }
-    
+
     fn stop(&self) {
         todo!()
+    }
+}
+
+impl Drop for WindowsFramebuffer {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.bitmap.is_invalid() {
+                let _ = DeleteObject(self.bitmap);
+            }
+
+            if !self.hdc.is_invalid() {
+                let _ = DeleteDC(self.hdc);
+            }
+
+            if !self.hwnd.is_invalid() {
+                let _ = DestroyWindow(self.hwnd);
+            }
+        }
     }
 }
