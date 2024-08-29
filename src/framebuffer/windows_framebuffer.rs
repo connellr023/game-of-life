@@ -1,6 +1,12 @@
 use super::framebuffer::Framebuffer;
 use anyhow::{anyhow, Result};
-use std::{cell::Cell, ffi::OsStr, os::windows::ffi::OsStrExt, ptr::null_mut};
+use std::{
+    cell::Cell,
+    collections::HashMap,
+    ffi::{c_void, OsStr},
+    os::windows::ffi::OsStrExt,
+    ptr::null_mut,
+};
 use windows::{
     core::PCWSTR,
     Win32::{
@@ -19,6 +25,7 @@ pub struct WindowsFramebuffer {
     width: u32,
     height: u32,
     is_running: Cell<bool>,
+    keydown_listeners: HashMap<u32, Box<dyn Fn()>>,
 }
 
 impl WindowsFramebuffer {
@@ -121,7 +128,7 @@ impl Framebuffer for WindowsFramebuffer {
                 hdc,
                 &bmi,
                 DIB_RGB_COLORS,
-                &mut buffer as *mut *mut u8 as *mut *mut std::ffi::c_void,
+                &mut buffer as *mut *mut u8 as *mut *mut c_void,
                 HANDLE::default(),
                 0,
             )
@@ -144,6 +151,7 @@ impl Framebuffer for WindowsFramebuffer {
             width,
             height,
             is_running: Cell::new(true),
+            keydown_listeners: HashMap::new(),
         })
     }
 
@@ -158,6 +166,14 @@ impl Framebuffer for WindowsFramebuffer {
             } else {
                 let _ = TranslateMessage(&msg);
                 DispatchMessageA(&msg);
+
+                if msg.message == WM_KEYDOWN {
+                    let keycode = msg.wParam.0 as u32;
+
+                    if let Some(listener) = self.keydown_listeners.get(&keycode) {
+                        listener();
+                    }
+                }
             }
         }
     }
@@ -201,12 +217,8 @@ impl Framebuffer for WindowsFramebuffer {
         }
     }
 
-    fn register_keydown_listener(&self, keycode: u32, listener: Box<dyn Fn()>) {
-        todo!()
-    }
-
-    fn clear_keydown_listeners(&self) {
-        todo!()
+    fn register_keydown_listener(&mut self, keycode: u32, listener: Box<dyn Fn()>) {
+        self.keydown_listeners.insert(keycode, listener);
     }
 
     fn is_running(&self) -> bool {
@@ -214,12 +226,14 @@ impl Framebuffer for WindowsFramebuffer {
     }
 
     fn stop(&self) {
-        todo!()
+        self.is_running.set(false);
     }
 }
 
 impl Drop for WindowsFramebuffer {
     fn drop(&mut self) {
+        self.keydown_listeners.clear();
+
         unsafe {
             if !self.bitmap.is_invalid() {
                 let _ = DeleteObject(self.bitmap);
