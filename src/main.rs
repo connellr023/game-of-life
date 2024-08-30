@@ -57,7 +57,7 @@ fn main() -> Result<()> {
 
     game.generate();
 
-    while fb.is_running() && game.is_running() {
+    while fb.is_running() {
         fb.handle_events();
         fb.render();
 

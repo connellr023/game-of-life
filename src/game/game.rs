@@ -2,7 +2,6 @@ use rand::Rng;
 
 use crate::{framebuffer::prelude::PlatformFramebuffer, Framebuffer};
 use std::{
-    cell::Cell,
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -17,7 +16,6 @@ enum CurrentGrid {
 
 pub struct Game {
     fb: Rc<PlatformFramebuffer>,
-    is_running: Cell<bool>,
 
     grid_1: Box<[bool]>,
     grid_2: Box<[bool]>,
@@ -45,7 +43,6 @@ impl Game {
 
         Self {
             fb,
-            is_running: Cell::new(true),
             grid_1,
             grid_2,
             current_grid: CurrentGrid::Grid1,
@@ -78,11 +75,6 @@ impl Game {
             CurrentGrid::Grid1 => CurrentGrid::Grid2,
             CurrentGrid::Grid2 => CurrentGrid::Grid1,
         };
-    }
-
-    #[inline(always)]
-    pub fn is_running(&self) -> bool {
-        self.is_running.get()
     }
 
     #[inline(always)]
