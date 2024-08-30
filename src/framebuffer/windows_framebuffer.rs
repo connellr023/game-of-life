@@ -1,4 +1,4 @@
-use super::framebuffer::Framebuffer;
+use super::prelude::*;
 use anyhow::{anyhow, Result};
 use std::{
     cell::Cell,
@@ -17,7 +17,7 @@ use windows::{
     },
 };
 
-pub struct WindowsFramebuffer {
+pub struct WindowsFramebuffer<'a> {
     hwnd: HWND,
     hdc: HDC,
     bitmap: HBITMAP,
@@ -25,10 +25,10 @@ pub struct WindowsFramebuffer {
     width: u32,
     height: u32,
     is_running: Cell<bool>,
-    keydown_listeners: HashMap<u32, Box<dyn Fn()>>,
+    keydown_listeners: HashMap<u32, BoxedListener<'a>>,
 }
 
-impl WindowsFramebuffer {
+impl<'a> WindowsFramebuffer<'a> {
     unsafe extern "system" fn window_proc(
         hwnd: HWND,
         msg: u32,
@@ -49,7 +49,7 @@ impl WindowsFramebuffer {
     }
 }
 
-impl Framebuffer for WindowsFramebuffer {
+impl<'a> Framebuffer<'a> for WindowsFramebuffer<'a> {
     fn create_window(title: &str, width: u32, height: u32) -> Result<Self> {
         let h_instance = unsafe { GetModuleHandleW(None) }?.into();
         let w_title = {
@@ -159,19 +159,20 @@ impl Framebuffer for WindowsFramebuffer {
         let mut msg = MSG::default();
 
         unsafe {
-            let result = GetMessageA(&mut msg, None, 0, 0);
+            while PeekMessageA(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                if msg.message == WM_QUIT {
+                    self.is_running.set(false);
+                    break;
+                } else {
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageA(&msg);
 
-            if !result.as_bool() {
-                self.is_running.set(false);
-            } else {
-                let _ = TranslateMessage(&msg);
-                DispatchMessageA(&msg);
+                    if msg.message == WM_KEYDOWN {
+                        let keycode = msg.wParam.0 as u32;
 
-                if msg.message == WM_KEYDOWN {
-                    let keycode = msg.wParam.0 as u32;
-
-                    if let Some(listener) = self.keydown_listeners.get(&keycode) {
-                        listener();
+                        if let Some(listener) = self.keydown_listeners.get(&keycode) {
+                            listener();
+                        }
                     }
                 }
             }
@@ -207,7 +208,7 @@ impl Framebuffer for WindowsFramebuffer {
     }
 
     fn write_pixel(&self, x: u32, y: u32, color: u32) {
-        assert!(x < self.width && y < self.height, "Pixel out of bounds");
+        debug_assert!(x < self.width && y < self.height, "Pixel out of bounds");
 
         let offset = (y * self.width + x) * 4;
 
@@ -217,20 +218,16 @@ impl Framebuffer for WindowsFramebuffer {
         }
     }
 
-    fn register_keydown_listener(&mut self, keycode: u32, listener: Box<dyn Fn()>) {
+    fn register_keydown_listener(&mut self, keycode: u32, listener: BoxedListener<'a>) {
         self.keydown_listeners.insert(keycode, listener);
     }
 
     fn is_running(&self) -> bool {
         self.is_running.get()
     }
-
-    fn stop(&self) {
-        self.is_running.set(false);
-    }
 }
 
-impl Drop for WindowsFramebuffer {
+impl<'a> Drop for WindowsFramebuffer<'a> {
     fn drop(&mut self) {
         self.keydown_listeners.clear();
 

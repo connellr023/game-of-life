@@ -1,6 +1,7 @@
 use crate::framebuffer::prelude::*;
 use crate::game::prelude::*;
 use anyhow::Result;
+use std::cell::Cell;
 use std::rc::Rc;
 
 mod framebuffer;
@@ -15,25 +16,28 @@ const TILE_PIXEL_SIZE: u16 = 8;
 const WINDOW_WIDTH: u32 = (GRID_WIDTH * TILE_PIXEL_SIZE) as u32;
 const WINDOW_HEIGHT: u32 = (GRID_HEIGHT * TILE_PIXEL_SIZE) as u32;
 
+const SIM_UPDATE_MS: u64 = 30;
+
 const KEY_ESCAPE: u32 = 0x1B;
 
 fn main() -> Result<()> {
     let mut fb = PlatformFramebuffer::create_window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT)?;
-    let fb_ptr = Rc::new(&mut fb as *mut PlatformFramebuffer);
+    let did_quit = Rc::new(Cell::new(false));
 
     fb.register_keydown_listener(
         KEY_ESCAPE,
         Box::new({
-            let fb_ptr = Rc::clone(&fb_ptr);
-            move || unsafe {
-                (**fb_ptr).stop();
+            let did_quit = Rc::clone(&did_quit);
+            move || {
+                did_quit.set(true);
             }
         }),
     );
 
-    let mut game = Game::new(&fb, GRID_WIDTH, GRID_HEIGHT, TILE_PIXEL_SIZE);
+    let mut game = Game::new(&fb, GRID_WIDTH, GRID_HEIGHT, TILE_PIXEL_SIZE, SIM_UPDATE_MS);
+    game.init();
 
-    while fb.is_running() && game.is_running() {
+    while fb.is_running() && game.is_running() && !did_quit.get() {
         fb.handle_events();
         fb.render();
 
