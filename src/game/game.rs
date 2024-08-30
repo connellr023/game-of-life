@@ -21,7 +21,6 @@ pub struct Game<'a> {
     grid_1: Box<[bool]>,
     grid_2: Box<[bool]>,
     current_grid: CurrentGrid,
-    current_grid_ptr: *mut bool,
 
     grid_width: u16,
     grid_height: u16,
@@ -33,16 +32,9 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
-    pub fn new(
-        fb: &'a PlatformFramebuffer,
-        width: u16,
-        height: u16,
-        tile_pixel_size: u16,
-        sim_update_ms: u64,
-    ) -> Self {
-        let mut grid_1 = vec![false; (width * height) as usize].into_boxed_slice();
+    pub fn new(fb: &'a PlatformFramebuffer, width: u16, height: u16, tile_pixel_size: u16, sim_update_ms: u64) -> Self {
+        let grid_1 = vec![false; (width * height) as usize].into_boxed_slice();
         let grid_2 = grid_1.clone();
-        let current_grid_ptr = grid_1.as_mut_ptr();
 
         Self {
             fb,
@@ -50,7 +42,6 @@ impl<'a> Game<'a> {
             grid_1,
             grid_2,
             current_grid: CurrentGrid::Grid1,
-            current_grid_ptr,
             grid_width: width,
             grid_height: height,
             tile_pixel_size,
@@ -68,31 +59,18 @@ impl<'a> Game<'a> {
         }
     }
 
-    fn copy_grid(&self, src: &[bool], dst: *mut bool) {
-        for i in 0..src.len() {
-            unsafe {
-                *dst.offset(i as isize) = src[i];
-            }
-        }
-    }
-
     fn swap_grids(&mut self) {
-        match self.current_grid {
-            CurrentGrid::Grid1 => {
-                let grid_2_ptr = self.grid_2.as_mut_ptr();
+        let (current_grid, next_grid) = match self.current_grid {
+            CurrentGrid::Grid1 => (&self.grid_1, &mut self.grid_2),
+            CurrentGrid::Grid2 => (&self.grid_2, &mut self.grid_1),
+        };
 
-                self.copy_grid(&self.grid_1, grid_2_ptr);
-                self.current_grid = CurrentGrid::Grid2;
-                self.current_grid_ptr = grid_2_ptr;
-            }
-            CurrentGrid::Grid2 => {
-                let grid_1_ptr = self.grid_1.as_mut_ptr();
+        next_grid.copy_from_slice(current_grid);
 
-                self.copy_grid(&self.grid_2, grid_1_ptr);
-                self.current_grid = CurrentGrid::Grid1;
-                self.current_grid_ptr = grid_1_ptr;
-            }
-        }
+        self.current_grid = match self.current_grid {
+            CurrentGrid::Grid1 => CurrentGrid::Grid2,
+            CurrentGrid::Grid2 => CurrentGrid::Grid1,
+        };
     }
 
     #[inline(always)]
@@ -116,20 +94,29 @@ impl<'a> Game<'a> {
     }
 
     #[inline(always)]
-    fn get_tile(&self, x: u16, y: u16) -> bool {
-        unsafe {
-            *self
-                .current_grid_ptr
-                .offset(self.calc_grid_idx(x, y) as isize)
+    fn get_current_grid(&self) -> &[bool] {
+        match self.current_grid {
+            CurrentGrid::Grid1 => &self.grid_1,
+            CurrentGrid::Grid2 => &self.grid_2,
         }
     }
 
-    fn set_tile(&mut self, is_alive: bool, x: u16, y: u16) {
-        unsafe {
-            *self
-                .current_grid_ptr
-                .offset(self.calc_grid_idx(x, y) as isize) = is_alive;
+    #[inline(always)]
+    fn get_current_grid_mut(&mut self) -> &mut [bool] {
+        match self.current_grid {
+            CurrentGrid::Grid1 => &mut self.grid_1,
+            CurrentGrid::Grid2 => &mut self.grid_2,
         }
+    }
+
+    #[inline(always)]
+    fn get_tile(&self, x: u16, y: u16) -> bool {
+        self.get_current_grid()[self.calc_grid_idx(x, y)]
+    }
+
+    fn set_tile(&mut self, is_alive: bool, x: u16, y: u16) {
+        let idx = self.calc_grid_idx(x, y);
+        self.get_current_grid_mut()[idx] = is_alive;
 
         let color = if is_alive { SET_COLOR } else { UNSET_COLOR };
 
