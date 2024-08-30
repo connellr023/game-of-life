@@ -8,14 +8,14 @@ mod game;
 
 const WINDOW_TITLE: &str = "Game Of Life";
 
-const GRID_WIDTH: u16 = 64;
-const GRID_HEIGHT: u16 = 64;
-const TILE_PIXEL_SIZE: u16 = 8;
+const GRID_WIDTH: u16 = 256;
+const GRID_HEIGHT: u16 = 128;
+const TILE_PIXEL_SIZE: u16 = 6;
 
 const WINDOW_WIDTH: u32 = (GRID_WIDTH * TILE_PIXEL_SIZE) as u32;
 const WINDOW_HEIGHT: u32 = (GRID_HEIGHT * TILE_PIXEL_SIZE) as u32;
 
-const SIM_UPDATE_MS: u64 = 30;
+const SIM_UPDATE_MS: u64 = 35;
 
 const KEY_ESCAPE: u32 = 0x1B;
 const KEY_ENTER: u32 = 0x0D;

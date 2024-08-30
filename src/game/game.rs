@@ -9,7 +9,7 @@ use std::{
 const SET_COLOR: u32 = 0xFFFFFF;
 const UNSET_COLOR: u32 = 0x000000;
 
-enum CurrentGrid {
+enum GridSelector {
     Grid1,
     Grid2,
 }
@@ -19,7 +19,7 @@ pub struct Game {
 
     grid_1: Box<[bool]>,
     grid_2: Box<[bool]>,
-    current_grid: CurrentGrid,
+    current_grid: GridSelector,
 
     grid_width: u16,
     grid_height: u16,
@@ -45,7 +45,7 @@ impl Game {
             fb,
             grid_1,
             grid_2,
-            current_grid: CurrentGrid::Grid1,
+            current_grid: GridSelector::Grid1,
             grid_width: width,
             grid_height: height,
             tile_pixel_size,
@@ -65,15 +65,15 @@ impl Game {
 
     fn swap_grids(&mut self) {
         let (current_grid, next_grid) = match self.current_grid {
-            CurrentGrid::Grid1 => (&self.grid_1, &mut self.grid_2),
-            CurrentGrid::Grid2 => (&self.grid_2, &mut self.grid_1),
+            GridSelector::Grid1 => (&self.grid_1, &mut self.grid_2),
+            GridSelector::Grid2 => (&self.grid_2, &mut self.grid_1),
         };
 
         next_grid.copy_from_slice(current_grid);
 
         self.current_grid = match self.current_grid {
-            CurrentGrid::Grid1 => CurrentGrid::Grid2,
-            CurrentGrid::Grid2 => CurrentGrid::Grid1,
+            GridSelector::Grid1 => GridSelector::Grid2,
+            GridSelector::Grid2 => GridSelector::Grid1,
         };
     }
 
@@ -95,16 +95,16 @@ impl Game {
     #[inline(always)]
     fn get_current_grid(&self) -> &[bool] {
         match self.current_grid {
-            CurrentGrid::Grid1 => &self.grid_1,
-            CurrentGrid::Grid2 => &self.grid_2,
+            GridSelector::Grid1 => &self.grid_1,
+            GridSelector::Grid2 => &self.grid_2,
         }
     }
 
     #[inline(always)]
     fn get_current_grid_mut(&mut self) -> &mut [bool] {
         match self.current_grid {
-            CurrentGrid::Grid1 => &mut self.grid_1,
-            CurrentGrid::Grid2 => &mut self.grid_2,
+            GridSelector::Grid1 => &mut self.grid_1,
+            GridSelector::Grid2 => &mut self.grid_2,
         }
     }
 
