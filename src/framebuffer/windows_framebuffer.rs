@@ -1,7 +1,7 @@
 use super::prelude::*;
 use anyhow::{anyhow, Result};
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     ffi::{c_void, OsStr},
     os::windows::ffi::OsStrExt,
@@ -17,7 +17,7 @@ use windows::{
     },
 };
 
-pub struct WindowsFramebuffer<'a> {
+pub struct WindowsFramebuffer {
     hwnd: HWND,
     hdc: HDC,
     bitmap: HBITMAP,
@@ -25,10 +25,10 @@ pub struct WindowsFramebuffer<'a> {
     width: u32,
     height: u32,
     is_running: Cell<bool>,
-    keydown_listeners: HashMap<u32, BoxedListener<'a>>,
+    keydown_listeners: RefCell<HashMap<u32, BoxedListener>>,
 }
 
-impl<'a> WindowsFramebuffer<'a> {
+impl WindowsFramebuffer {
     unsafe extern "system" fn window_proc(
         hwnd: HWND,
         msg: u32,
@@ -49,7 +49,7 @@ impl<'a> WindowsFramebuffer<'a> {
     }
 }
 
-impl<'a> Framebuffer<'a> for WindowsFramebuffer<'a> {
+impl Framebuffer for WindowsFramebuffer {
     fn create_window(title: &str, width: u32, height: u32) -> Result<Self> {
         let h_instance = unsafe { GetModuleHandleW(None) }?.into();
         let w_title = {
@@ -151,7 +151,7 @@ impl<'a> Framebuffer<'a> for WindowsFramebuffer<'a> {
             width,
             height,
             is_running: Cell::new(true),
-            keydown_listeners: HashMap::new(),
+            keydown_listeners: RefCell::new(HashMap::new()),
         })
     }
 
@@ -170,7 +170,7 @@ impl<'a> Framebuffer<'a> for WindowsFramebuffer<'a> {
                     if msg.message == WM_KEYDOWN {
                         let keycode = msg.wParam.0 as u32;
 
-                        if let Some(listener) = self.keydown_listeners.get(&keycode) {
+                        if let Some(listener) = self.keydown_listeners.borrow().get(&keycode) {
                             listener();
                         }
                     }
@@ -218,18 +218,24 @@ impl<'a> Framebuffer<'a> for WindowsFramebuffer<'a> {
         }
     }
 
-    fn register_keydown_listener(&mut self, keycode: u32, listener: BoxedListener<'a>) {
-        self.keydown_listeners.insert(keycode, listener);
+    fn register_keydown_listener(&self, keycode: u32, listener: BoxedListener) {
+        self.keydown_listeners
+            .borrow_mut()
+            .insert(keycode, listener);
     }
 
     fn is_running(&self) -> bool {
         self.is_running.get()
     }
+
+    fn stop(&self) {
+        self.is_running.set(false);
+    }
 }
 
-impl<'a> Drop for WindowsFramebuffer<'a> {
+impl Drop for WindowsFramebuffer {
     fn drop(&mut self) {
-        self.keydown_listeners.clear();
+        self.keydown_listeners.borrow_mut().clear();
 
         unsafe {
             if !self.bitmap.is_invalid() {

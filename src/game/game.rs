@@ -3,6 +3,7 @@ use rand::Rng;
 use crate::{framebuffer::prelude::PlatformFramebuffer, Framebuffer};
 use std::{
     cell::Cell,
+    rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -14,8 +15,8 @@ enum CurrentGrid {
     Grid2,
 }
 
-pub struct Game<'a> {
-    fb: &'a PlatformFramebuffer<'a>,
+pub struct Game {
+    fb: Rc<PlatformFramebuffer>,
     is_running: Cell<bool>,
 
     grid_1: Box<[bool]>,
@@ -31,8 +32,14 @@ pub struct Game<'a> {
     last_sim_update_ms: u64,
 }
 
-impl<'a> Game<'a> {
-    pub fn new(fb: &'a PlatformFramebuffer, width: u16, height: u16, tile_pixel_size: u16, sim_update_ms: u64) -> Self {
+impl Game {
+    pub fn new(
+        fb: Rc<PlatformFramebuffer>,
+        width: u16,
+        height: u16,
+        tile_pixel_size: u16,
+        sim_update_ms: u64,
+    ) -> Self {
         let grid_1 = vec![false; (width * height) as usize].into_boxed_slice();
         let grid_2 = grid_1.clone();
 
@@ -50,10 +57,10 @@ impl<'a> Game<'a> {
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn generate(&mut self) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
-                let is_alive = rand::thread_rng().gen_bool(0.1);
+                let is_alive = rand::thread_rng().gen_bool(0.15);
                 self.set_tile(is_alive, x, y);
             }
         }
