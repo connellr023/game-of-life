@@ -2,20 +2,19 @@ use crate::framebuffer::prelude::*;
 use crate::game::prelude::*;
 use anyhow::Result;
 use std::rc::Rc;
+use std::time::Duration;
 
 mod framebuffer;
 mod game;
 
 const WINDOW_TITLE: &str = "Game Of Life";
 
-const GRID_WIDTH: u16 = 256;
-const GRID_HEIGHT: u16 = 128;
-const TILE_PIXEL_SIZE: u16 = 6;
+const GRID_WIDTH: u16 = 312;
+const GRID_HEIGHT: u16 = 256;
+const TILE_PIXEL_SIZE: u16 = 4;
 
 const WINDOW_WIDTH: u32 = (GRID_WIDTH * TILE_PIXEL_SIZE) as u32;
 const WINDOW_HEIGHT: u32 = (GRID_HEIGHT * TILE_PIXEL_SIZE) as u32;
-
-const SIM_UPDATE_MS: u64 = 35;
 
 const KEY_ESCAPE: u32 = 0x1B;
 const KEY_ENTER: u32 = 0x0D;
@@ -42,7 +41,7 @@ fn main() -> Result<()> {
         GRID_WIDTH,
         GRID_HEIGHT,
         TILE_PIXEL_SIZE,
-        SIM_UPDATE_MS,
+        Duration::from_millis(200),
     );
 
     fb.register_keydown_listener(
@@ -62,6 +61,7 @@ fn main() -> Result<()> {
         fb.render();
 
         game.update();
+        game.render();
     }
 
     Ok(())

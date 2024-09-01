@@ -10,7 +10,7 @@ use std::{
 use windows::{
     core::PCWSTR,
     Win32::{
-        Foundation::{HANDLE, HWND, LPARAM, LRESULT, WPARAM},
+        Foundation::{HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
         Graphics::Gdi::*,
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::*,
@@ -69,7 +69,7 @@ impl Framebuffer for WindowsFramebuffer {
             cbClsExtra: 0,
             cbWndExtra: 0,
             hIcon: HICON::default(),
-            hCursor: HCURSOR::default(),
+            hCursor: unsafe { LoadCursorW(HINSTANCE::default(), IDC_ARROW) }.expect("LoadCursorW"),
             hbrBackground: HBRUSH::default(),
             lpszMenuName: PCWSTR(&0),
         };
