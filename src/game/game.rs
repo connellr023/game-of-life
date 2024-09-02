@@ -25,6 +25,7 @@ pub struct Game {
 
     update_interval: Duration,
     last_update: Instant,
+    start_time: Instant,
 
     blend_factor: f32,
 }
@@ -49,23 +50,24 @@ impl Game {
             tile_pixel_size,
             update_interval,
             last_update: Instant::now(),
+            start_time: Instant::now(),
             blend_factor: 0.0,
         }
     }
 
-    fn gradient(&self, x: u16, y: u16) -> u32 {
+    fn gradient(&self, x: u16, y: u16, shift: f32) -> u32 {
         let pi = std::f32::consts::PI;
         let normalized_x = x as f32 / self.grid_width as f32;
         let normalized_y = y as f32 / self.grid_height as f32;
 
-        let r = (0.5 * (1.0 + (normalized_x * pi).sin()) * 255.0) as u32;
-        let g = (0.5 * (1.0 + (normalized_y * pi).sin()) * 255.0) as u32;
-        let b = (0.5 * (1.0 + ((normalized_x + normalized_y) * pi).sin()) * 255.0) as u32;
+        let r = (0.5 * (1.0 + ((normalized_x + shift) * pi).sin()) * 255.0) as u32;
+        let g = (0.5 * (1.0 + ((normalized_y + shift) * pi).sin()) * 255.0) as u32;
+        let b = (0.5 * (1.0 + ((normalized_x + normalized_y + shift) * pi).sin()) * 255.0) as u32;
 
         (r << 16) | (g << 8) | b
     }
 
-    fn interpolate_color(&self, current_color: u32, next_color:  u32) -> u32 {
+    fn interpolate_color(&self, current_color: u32, next_color: u32) -> u32 {
         let blend_factor = self.blend_factor;
 
         let r = ((current_color >> 16 & 0xFF) as f32 * (1.0 - blend_factor)
@@ -210,7 +212,10 @@ impl Game {
     pub fn render(&self) {
         let decide_color = |is_alive: bool, x: u16, y: u16| {
             if is_alive {
-                self.gradient(x, y)
+                let elapsed = self.start_time.elapsed().as_secs_f32();
+                let shift = elapsed * 0.7;
+
+                self.gradient(x, y, shift)
             } else {
                 0x000000
             }
