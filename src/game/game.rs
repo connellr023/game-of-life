@@ -26,8 +26,6 @@ pub struct Game {
     update_interval: Duration,
     last_update: Instant,
     start_time: Instant,
-
-    blend_factor: f32,
 }
 
 impl Game {
@@ -51,26 +49,43 @@ impl Game {
             update_interval,
             last_update: Instant::now(),
             start_time: Instant::now(),
-            blend_factor: 0.0,
         }
     }
 
-    fn gradient(&self, x: u16, y: u16, shift: f32) -> u32 {
-        let pi = std::f32::consts::PI;
-        let normalized_x = x as f32 / self.grid_width as f32;
-        let normalized_y = y as f32 / self.grid_height as f32;
+    fn hsv_to_rgb(h: f32, s: f32, v: f32) -> u32 {
+        let c = v * s;
+        let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+        let m = v - c;
 
-        let r = (0.5 * (1.0 + ((normalized_x + shift) * pi).sin()) * 255.0) as u32;
-        let g = (0.5 * (1.0 + ((normalized_y + shift) * pi).sin()) * 255.0) as u32;
-        let b = (0.5 * (1.0 + ((normalized_x + normalized_y + shift) * pi).sin()) * 255.0) as u32;
+        let (r, g, b) = match h {
+            0.0..=60.0 => (c, x, 0.0),
+            60.0..=120.0 => (x, c, 0.0),
+            120.0..=180.0 => (0.0, c, x),
+            180.0..=240.0 => (0.0, x, c),
+            240.0..=300.0 => (x, 0.0, c),
+            300.0..=360.0 => (c, 0.0, x),
+            _ => (0.0, 0.0, 0.0),
+        };
+
+        let r = ((r + m) * 255.0) as u32;
+        let g = ((g + m) * 255.0) as u32;
+        let b = ((b + m) * 255.0) as u32;
 
         (r << 16) | (g << 8) | b
+    }
+
+    fn gradient(&self, x: u16, y: u16, shift: f32) -> u32 {
+        let hue_x = x as f32 / self.grid_width as f32;
+        let hue_y = y as f32 / self.grid_height as f32;
+        let hue = ((hue_x + hue_y + shift) % 1.0) * 360.0;
+
+        Self::hsv_to_rgb(hue, 1.0, 1.0)
     }
 
     pub fn generate(&mut self) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
-                let is_alive = rand::thread_rng().gen_bool(0.12);
+                let is_alive = rand::thread_rng().gen_bool(0.04);
                 self.set_tile(is_alive, x, y);
             }
         }
@@ -174,7 +189,6 @@ impl Game {
         if now.duration_since(self.last_update) >= self.update_interval {
             self.swap_grids();
             self.last_update = now;
-            self.blend_factor = 0.0;
 
             for x in 0..self.grid_width {
                 for y in 0..self.grid_height {
@@ -190,9 +204,6 @@ impl Game {
                     }
                 }
             }
-        } else {
-            self.blend_factor = now.duration_since(self.last_update).as_secs_f32()
-                / self.update_interval.as_secs_f32();
         }
     }
 
