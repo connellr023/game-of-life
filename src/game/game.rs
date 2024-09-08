@@ -6,23 +6,30 @@ use std::{
     time::{Duration, Instant},
 };
 
+const CURSOR_COLOR: u32 = 0xFFFFFF;
+const BG_COLOR: u32 = 0x000000;
+
 enum GridSelector {
     Grid1,
     Grid2,
 }
 
+pub enum CursorDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 pub struct Game {
     fb: Rc<PlatformFramebuffer>,
-
     grid_1: Box<[bool]>,
     grid_2: Box<[bool]>,
     current_grid: GridSelector,
-
     grid_width: u16,
     grid_height: u16,
-
+    cursor_pos: (u16, u16),
     tile_pixel_size: u16,
-
     update_interval: Duration,
     last_update: Instant,
     start_time: Instant,
@@ -45,11 +52,49 @@ impl Game {
             current_grid: GridSelector::Grid1,
             grid_width: width,
             grid_height: height,
+            cursor_pos: (width / 2, height / 2),
             tile_pixel_size,
             update_interval,
             last_update: Instant::now(),
             start_time: Instant::now(),
         }
+    }
+
+    pub fn move_cursor(&mut self, dir: CursorDirection) {
+        let (x, y) = self.cursor_pos;
+
+        match dir {
+            CursorDirection::Up => {
+                if y > 0 {
+                    self.cursor_pos.1 -= 1;
+                }
+            }
+            CursorDirection::Down => {
+                if y < self.grid_height - 1 {
+                    self.cursor_pos.1 += 1;
+                }
+            }
+            CursorDirection::Left => {
+                if x > 0 {
+                    self.cursor_pos.0 -= 1;
+                }
+            }
+            CursorDirection::Right => {
+                if x < self.grid_width - 1 {
+                    self.cursor_pos.0 += 1;
+                }
+            }
+        }
+    }
+
+    pub fn place_cursor(&mut self) {
+        let (x, y) = self.cursor_pos;
+
+        self.set_tile(false, x, y);
+        self.set_tile(true, x + 1, y);
+        self.set_tile(true, x - 1, y);
+        self.set_tile(true, x, y + 1);
+        self.set_tile(true, x, y - 1);
     }
 
     fn hsv_to_rgb(h: f32, s: f32, v: f32) -> u32 {
@@ -219,11 +264,13 @@ impl Game {
 
                     self.gradient(x, y, shift)
                 } else {
-                    0x000000
+                    BG_COLOR
                 };
 
                 self.render_tile(next_color, x, y);
             }
         }
+
+        self.render_tile(CURSOR_COLOR, self.cursor_pos.0, self.cursor_pos.1);
     }
 }
