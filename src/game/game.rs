@@ -67,19 +67,6 @@ impl Game {
         (r << 16) | (g << 8) | b
     }
 
-    fn interpolate_color(&self, current_color: u32, next_color: u32) -> u32 {
-        let blend_factor = self.blend_factor;
-
-        let r = ((current_color >> 16 & 0xFF) as f32 * (1.0 - blend_factor)
-            + (next_color >> 16 & 0xFF) as f32 * blend_factor) as u32;
-        let g = ((current_color >> 8 & 0xFF) as f32 * (1.0 - blend_factor)
-            + (next_color >> 8 & 0xFF) as f32 * blend_factor) as u32;
-        let b = ((current_color & 0xFF) as f32 * (1.0 - blend_factor)
-            + (next_color & 0xFF) as f32 * blend_factor) as u32;
-
-        (r << 16) | (g << 8) | b
-    }
-
     pub fn generate(&mut self) {
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
@@ -210,28 +197,21 @@ impl Game {
     }
 
     pub fn render(&self) {
-        let decide_color = |is_alive: bool, x: u16, y: u16| {
-            if is_alive {
-                let elapsed = self.start_time.elapsed().as_secs_f32();
-                let shift = elapsed * 0.7;
-
-                self.gradient(x, y, shift)
-            } else {
-                0x000000
-            }
-        };
-
         for y in 0..self.grid_height {
             for x in 0..self.grid_width {
                 let idx = self.calc_grid_idx(x, y);
-                let current_state = self.get_current_grid()[idx];
-                let next_state = self.get_next_grid()[idx];
+                let is_alive = self.get_next_grid()[idx];
 
-                let current_color = decide_color(current_state, x, y);
-                let next_color = decide_color(next_state, x, y);
-                let color = self.interpolate_color(current_color, next_color);
+                let next_color = if is_alive {
+                    let elapsed = self.start_time.elapsed().as_secs_f32();
+                    let shift = elapsed * 0.7;
 
-                self.render_tile(color, x, y);
+                    self.gradient(x, y, shift)
+                } else {
+                    0x000000
+                };
+
+                self.render_tile(next_color, x, y);
             }
         }
     }

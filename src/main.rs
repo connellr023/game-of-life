@@ -9,8 +9,8 @@ mod game;
 
 const WINDOW_TITLE: &str = "Game Of Life";
 
-const GRID_WIDTH: u16 = 312;
-const GRID_HEIGHT: u16 = 256;
+const GRID_WIDTH: u16 = 370;
+const GRID_HEIGHT: u16 = 230;
 const TILE_PIXEL_SIZE: u16 = 4;
 
 const WINDOW_WIDTH: u32 = (GRID_WIDTH * TILE_PIXEL_SIZE) as u32;
@@ -18,6 +18,8 @@ const WINDOW_HEIGHT: u32 = (GRID_HEIGHT * TILE_PIXEL_SIZE) as u32;
 
 const KEY_ESCAPE: u32 = 0x1B;
 const KEY_ENTER: u32 = 0x0D;
+
+const UPDATE_MS: u64 = 110;
 
 fn main() -> Result<()> {
     let fb = Rc::new(PlatformFramebuffer::create_window(
@@ -41,7 +43,7 @@ fn main() -> Result<()> {
         GRID_WIDTH,
         GRID_HEIGHT,
         TILE_PIXEL_SIZE,
-        Duration::from_millis(200),
+        Duration::from_millis(UPDATE_MS),
     );
 
     fb.register_keydown_listener(
