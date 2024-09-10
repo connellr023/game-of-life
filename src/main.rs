@@ -4,6 +4,7 @@ use anyhow::Result;
 use std::rc::Rc;
 use std::time::Duration;
 
+mod macros;
 mod framebuffer;
 mod game;
 
@@ -33,15 +34,7 @@ fn main() -> Result<()> {
         WINDOW_HEIGHT,
     )?);
 
-    fb.register_keydown_listener(
-        KEY_ESCAPE,
-        Box::new({
-            let tmp_ptr = fb.as_ref() as *const PlatformFramebuffer;
-            move || unsafe {
-                (*tmp_ptr).stop();
-            }
-        }),
-    );
+    register_framebuffer_keydown_listener!(fb, KEY_ESCAPE, stop);
 
     let mut game = Game::new(
         Rc::clone(&fb),
